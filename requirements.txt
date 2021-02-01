@@ -2,3 +2,8 @@ deepdiff
 Flask
 smbus2
 pyserial
+netifaces
+luma
+Pillow
+psutil
+uptime
