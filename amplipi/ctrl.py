@@ -27,6 +27,7 @@ import deepdiff
 import pprint
 import os # files
 
+import amplipi.oled as oled
 import amplipi.rt as rt
 import amplipi.streams as streams
 import amplipi.utils as utils
@@ -111,6 +112,10 @@ class Api:
       self.set_zone(z['id'], source_id=z['source_id'], mute=True, vol=z['vol'], force_update=True)
     # configure all of the groups (some fields may need to be updated)
     self._update_groups()
+
+    # configure the display
+    self._display = oled.Display()
+    self.updated()
 
   def save(self):
     """ Saves the system state to json"""
@@ -359,6 +364,7 @@ class Api:
 
         # update the group stats (individual zone volumes, sources, and mute configuration can effect a group)
         self._update_groups()
+        self._update_display()
 
         return None
       except Exception as e:
@@ -371,6 +377,14 @@ class Api:
       if g['id'] == int(id):
         return i,g
     return None, None
+
+  def _update_display(self):
+    if self._display is None:
+      return
+    z_vols = [ 0 ] * len(self.status['zones'])
+    for z in self.status['zones']:
+      z_vols[z['id']] = int((z['vol'] + 79) * 100.0 / 79.0)
+    self._display.set_volumes(z_vols[:6])
 
   def _update_groups(self):
     """Updates the group's aggregate fields to maintain consistency and simplify app interface"""
