@@ -1,7 +1,7 @@
-from amplipi.oled import AmpliPi_OLED
+from amplipi.oled import Display
 import time
 
-oled = AmpliPi_OLED()
+oled = Display()
 
 i = 0
 

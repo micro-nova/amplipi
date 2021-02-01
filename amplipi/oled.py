@@ -25,7 +25,7 @@ from PIL import ImageFont
 # �               AmpliPI OLED class                 �
 # �    Provides OLED display for AmpliPi system      �
 # +--------------------------------------------------+
-class AmpliPi_OLED():
+class Display():
 
   # ================
   #  initialization
@@ -47,11 +47,11 @@ class AmpliPi_OLED():
     self.device = ssd1309(spi(port=2, device=0, gpio_DC=39, gpio_RST=40))
 
     # thread to periodically update display with stats
-    gather_stats_thread = threading.Thread(target=self.__gather_stats, daemon=True)
+    gather_stats_thread = threading.Thread(target=self._gather_stats, daemon=True)
     gather_stats_thread.start()
 
     # thread to draw to screen, updated via queue
-    display_update_thread = threading.Thread(target=self.__display_update, daemon=True)
+    display_update_thread = threading.Thread(target=self._display_update, daemon=True)
     display_update_thread.start()
 
   # =======================
@@ -80,7 +80,7 @@ class AmpliPi_OLED():
   q = queue.Queue()
 
   # update the display (runs on thread)
-  def __display_update(self):
+  def _display_update(self):
 
     # get fonts
     item_font  = ImageFont.truetype("AndaleMono.ttf", 10)
@@ -177,12 +177,12 @@ class AmpliPi_OLED():
           draw.rectangle((bar_rectangle_start, bar_rectangle_stop), fill="white")
 
       # done with this item
-      self.q.task_done();
+      self.q.task_done()
 
   # =====================
   #  gather system stats
   # =====================
-  def __gather_stats(self):
+  def _gather_stats(self):
 
     # run forever
     while(True):
