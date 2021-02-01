@@ -115,7 +115,7 @@ class Api:
 
     # configure the display
     self._display = oled.Display()
-    self.updated()
+    self._update_display()
 
   def save(self):
     """ Saves the system state to json"""

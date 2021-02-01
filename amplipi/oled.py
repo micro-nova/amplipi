@@ -83,8 +83,8 @@ class Display():
   def _display_update(self):
 
     # get fonts
-    item_font  = ImageFont.truetype("AndaleMono.ttf", 10)
-    tiny_font  = ImageFont.truetype("AndaleMono.ttf", 8)
+    item_font  = ImageFont.truetype("fonts/AndaleMono.ttf", 10)
+    tiny_font  = ImageFont.truetype("fonts/AndaleMono.ttf", 8)
 
     # variables to store screen status
     system_stats_strings = ["", "", "", ""]
