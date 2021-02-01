@@ -32,3 +32,6 @@ Below the volumes is an add zone/group selector. To play the current Pandora sta
       width="250">
   </img>
 </p>
+
+## Development
+See [DEVELOPING.md](DEVELOPING.md) for how to get started working on AmpliPi

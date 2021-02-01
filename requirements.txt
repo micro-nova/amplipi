@@ -1,4 +1,4 @@
 deepdiff
-pytest
-serial
+Flask
 smbus2
+pyserial
