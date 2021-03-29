@@ -176,7 +176,7 @@ class Shairport:
             d['album'] = data[2]
             d['paused'] = data[3]
             if int(data[4]):
-              d['img_url'] = '/static/imgs/srcs/{}/{}'.format(self.src, data[5])
+              d['img_url'] = '/generated/shairport/srcs/{}/{}'.format(self.src, data[5])
         # return d
     except Exception:
       pass
@@ -484,7 +484,7 @@ class DLNA:
                 '--gstout-audiodevice', utils.output_device(src), '--gstout-initial-volume-db',
                 '0.0', '-p', '{}'.format(portnum), '-u', '{}'.format(self.uuid),
                 '-f', '{}'.format(self.name), '--logfile',
-                '/home/pi/config/dlna/{}/metafifo'.format(src)]
+                '/home/pi/config/srcs/{}/metafifo'.format(src)]
     self.proc = subprocess.Popen(args=meta_args, preexec_fn=os.setpgrp, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     self.proc2 = subprocess.Popen(args=dlna_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print('{} connected to {}'.format(self.name, src))
@@ -507,7 +507,7 @@ class DLNA:
     self.src = None
 
   def info(self):
-    loc = '/home/pi/config/dlna/{}/currentSong'.format(self.src)
+    loc = '/home/pi/config/srcs/{}/currentSong'.format(self.src)
     try:
       with open(loc, 'r') as file:
         d = {}

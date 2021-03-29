@@ -19,7 +19,7 @@ dos2unix ${SCRIPT_DIR}/../scripts/*
 
 # make some stream scripts executable
 pushd ../streams
-chmod +x eventcmd.sh shairport_metadata.bash dlna_metadata.bash
+chmod +x eventcmd.sh shairport_metadata.bash dlna_metadata.bash use_ram.py
 popd
 
 # configure shairport-sync on pi for multi instance support and disable its daemon
@@ -121,5 +121,10 @@ bash ${SCRIPT_DIR}/update_web.bash
 
 echo "updating system alsa config"
 sudo cp ${SCRIPT_DIR}/asound.conf /etc/asound.conf
+
+echo "updating RAM disks"
+sudo cp ${SCRIPT_DIR}/use_ram.py /etc/init.d
+sudo update-rc.d use_ram.py defaults
+# TODO: Reboot required to get 'use_ram.py' working. Prompt?
 
 # webserver
