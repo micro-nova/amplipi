@@ -643,3 +643,127 @@ class InternetRadio:
     connection = ' connected to src={}'.format(self.src) if self.src else ''
     mock = ' (mock)' if self.mock else ''
     return 'internetradio connect: {}{}{}'.format(self.name, connection, mock)
+
+class Plexamp:
+  """ A Plexamp Stream """
+
+  def __init__(self, name, user, password, station, mock=False):
+    self.name = name
+    self.user = user
+    self.mock = mock
+    self.proc = None  # underlying plexamp process
+    self.state = 'disconnected'
+    self.src = None # source_id plexamp is connecting to
+
+  def reconfig(self, **kwargs):
+    reconnect_needed = False
+    if 'name' in kwargs and kwargs['name'] != self.name:
+      self.name = kwargs['name']
+      reconnect_needed = True
+    if reconnect_needed:
+      if self._is_plexamp_running():
+        last_src = self.src
+        self.disconnect()
+        time.sleep(0.1) # delay a bit, is this needed?
+        self.connect(last_src)
+
+  def __del__(self):
+    self.disconnect()
+
+  def __str__(self):
+    connection = ' connected to src={}'.format(self.src) if self.src else ''
+    mock = ' (mock)' if self.mock else ''
+    return 'plexamp: {}{}{}'.format(self.name, connection, mock )
+
+  def connect(self, src):
+    """ Connect plexamp output to a given audio source
+    This will start up plexamp with a configuration specific to @src
+    """
+    if self.mock:
+      print('{} connected to {}'.format(self.name, src))
+      self.state = 'connected'
+      self.src = src
+      return
+
+    src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), src)
+    ######### MAKE SURE THIS ACTUALLY IS GOOD ############
+    mpd_template = '{}/mpd.conf'.format(utils.get_folder('streams'))
+    ######### TEMP STOP HERE ###############################
+    pb_home = src_config_folder
+    pb_config_folder = '{}/.config/pianobar'.format(pb_home)
+    pb_control_fifo = '{}/ctl'.format(pb_config_folder)
+    pb_status_fifo = '{}/stat'.format(pb_config_folder)
+    pb_config_file = '{}/config'.format(pb_config_folder)
+    pb_output_file = '{}/output'.format(pb_config_folder)
+    pb_error_file = '{}/error'.format(pb_config_folder)
+    pb_eventcmd_file = '{}/eventcmd.sh'.format(pb_config_folder)
+    pb_src_config_file = '{}/.libao'.format(pb_home)
+    # make all of the necessary dir(s)
+    os.system('mkdir -p {}'.format(pb_config_folder))
+    os.system('cp {} {}'.format(eventcmd_template, pb_eventcmd_file)) # Copy to retains necessary executable status
+    # write pianobar and libao config files
+    write_config_file(pb_config_file, {
+      'user': self.user,
+      'password': self.password,
+      'autostart_station': self.station,
+      'fifo': pb_control_fifo,
+      'event_command': pb_eventcmd_file
+    })
+    write_config_file(pb_src_config_file, {'default_driver': 'alsa', 'dev': utils.output_device(src)})
+    # create fifos if needed
+    if not os.path.exists(pb_control_fifo):
+      os.system('mkfifo {}'.format(pb_control_fifo))
+    if not os.path.exists(pb_status_fifo):
+      os.system('mkfifo {}'.format(pb_status_fifo))
+    # start pandora process in special home
+    print('Pianobar config at {}'.format(pb_config_folder))
+    try:
+      self.proc = subprocess.Popen(args='pianobar', stdin=subprocess.PIPE, stdout=open(pb_output_file, 'w'), stderr=open(pb_error_file, 'w'), env={'HOME' : pb_home})
+      time.sleep(0.1) # Delay a bit before creating a control pipe to pianobar
+      self.ctrl = Pandora.Control(pb_control_fifo)
+      self.src = src
+      self.state = 'playing'
+      print('{} connected to {}'.format(self.name, src))
+    except Exception as e:
+      print('error starting pianobar: {}'.format(e))
+
+  def _is_pb_running(self):
+    if self.proc:
+      return self.proc.poll() is None
+    return False
+
+  def disconnect(self):
+    if self._is_pb_running():
+      self.ctrl.stop()
+      self.proc.kill()
+      print('{} disconnected'.format(self.name))
+    self.state = 'disconnected'
+    self.proc = None
+    self.ctrl = None
+    self.src = None
+
+  def info(self):
+    src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), self.src)
+    loc = '{}/.config/pianobar/currentSong'.format(src_config_folder)
+    try:
+      with open(loc, 'r') as file:
+        d = {}
+        for line in file.readlines():
+          line = line.strip()
+          if line:
+            data = line.split(',,,')
+            d['artist'] = data[0]
+            d['track'] = data[1]
+            d['album'] = data[2]
+            d['img_url'] = data[3]
+            d['station'] = data[5]
+        return(d)
+    except Exception:
+      pass
+      #print(error('Failed to get currentSong - it may not exist: {}'.format(e)))
+    # TODO: report the status of pianobar with station name, playing/paused, song info
+    # ie. Playing: "Cameras by Matt and Kim" on "Matt and Kim Radio"
+    return {'details': 'No info available'}
+
+  def status(self):
+    return self.state
