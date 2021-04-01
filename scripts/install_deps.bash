@@ -6,7 +6,7 @@
 # TODO: many of the checks here depend on apt, if something is manually installed this script will not detect it yet. Please fix.
 
 # get directory that the script exists in
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$( dirname "$0" )"
 
 # fix the line endings of the scripts copied over (thanks windows) (NOTE: we need to force LF line endings on this file)
 d2u_installed=$(sudo apt list --installed 2> /dev/null | grep dos2unix -c)
@@ -17,8 +17,10 @@ fi
 dos2unix ${SCRIPT_DIR}/*
 dos2unix ${SCRIPT_DIR}/../scripts/*
 
-# make some scripts executable
-chmod +x eventcmd.sh shairport_metadata.bash dlna_metadata.bash
+# make some stream scripts executable
+pushd ../streams
+chmod +x eventcmd.sh shairport_metadata.bash dlna_metadata.bash use_ram.py
+popd
 
 # configure shairport-sync on pi for multi instance support and disable its daemon
 sp_installed=$(sudo apt list --installed 2> /dev/null | grep shairport-sync -c)
@@ -31,30 +33,8 @@ if [ 0 -eq "${sp_installed}" ]; then
 fi
 
 # rough configuration of shairport-sync-metadata-reader
-git_installed=$(sudo apt list --installed 2> /dev/null | grep git/ -c)
-if [ 0 -eq "${git_installed}" ]; then
-  echo "installing git"
-  sudo apt update && sudo apt install -y git
-else
-  echo "git already installed"
-fi
+# TODO: we need to build this and install it as a binary
 
-# build-essential and autoconf are required to make the metadata reader
-be_installed=$(sudo apt list --installed 2> /dev/null | grep build-essential -c)
-if [ 0 -eq "${be_installed}" ]; then
-  echo "installing build-essential"
-  sudo apt update && sudo apt install -y build-essential
-else
-  echo "build-essential already installed"
-fi
-
-autoconf_installed=$(sudo apt list --installed 2> /dev/null | grep autoconf -c)
-if [ 0 -eq "${autoconf_installed}" ]; then
-  echo "installing autoconf"
-  sudo apt update && sudo apt install -y autoconf
-else
-  echo "autoconf already installed"
-fi
 
 cd /home/pi/config/
 ssmr_installed=$(sudo ls | grep shairport-sync-metadata-reader -c)
@@ -130,7 +110,7 @@ deactivate
 unit_installed=$(sudo apt list --installed 2> /dev/null | grep unit-python -c)
 if [ 0 -eq "${unit_installed}" ]; then
   echo "installing unit"
-  sudo apt update && sudo apt install -y ${SCRIPT_DIR}/../debs/unit_*.deb ${SCRIPT_DIR}/../debs/unit-python3.7_*.deb
+  sudo apt update && sudo apt install -y ../debs/unit_*.deb ../debs/unit-python3.7_*.deb
 else
   echo "unit already installed"
 fi
@@ -141,5 +121,10 @@ bash ${SCRIPT_DIR}/update_web.bash
 
 echo "updating system alsa config"
 sudo cp ${SCRIPT_DIR}/asound.conf /etc/asound.conf
+
+echo "updating RAM disks"
+sudo cp ${SCRIPT_DIR}/use_ram.py /etc/init.d
+sudo update-rc.d use_ram.py defaults
+# TODO: Reboot required to get 'use_ram.py' working. Prompt?
 
 # webserver
