@@ -131,12 +131,15 @@ class Shairport:
       },
     }
     src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), src)
+    generated_folder = '{}/{}'.format(utils.get_folder('generated'), src)
     # make all of the necessary dir(s)
-    os.system('mkdir -p {}'.format(src_config_folder)) # TODO: we need to delete all of the old cover art files!
+    os.system('rm -r -f {}'.format(generated_folder))
+    os.system('mkdir -p {}'.format(generated_folder))
+    os.system('mkdir -p {}'.format(src_config_folder))
     config_file = '{}/shairport.conf'.format(src_config_folder)
     write_sp_config_file(config_file, config)
     shairport_args = 'shairport-sync -c {}'.format(config_file).split(' ')
-    meta_args = ['{}/shairport_metadata.bash'.format(utils.get_folder('streams')), '{}'.format(src_config_folder)]
+    meta_args = ['{}/shairport_metadata.bash'.format(utils.get_folder('streams')), '{}'.format(src_config_folder), '{}'.format(generated_folder)]
     # TODO: figure out how to get status from shairport
     self.proc = subprocess.Popen(args=shairport_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     self.proc2 = subprocess.Popen(args=meta_args, preexec_fn=os.setpgrp, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -176,8 +179,7 @@ class Shairport:
             d['album'] = data[2]
             d['paused'] = data[3]
             if int(data[4]):
-              d['img_url'] = '/generated/shairport/srcs/{}/{}'.format(self.src, data[5])
-        # return d
+              d['img_url'] = '/generated/{}/{}'.format(self.src, data[5])
     except Exception:
       pass
       # TODO: Put an actual exception here?
@@ -193,11 +195,10 @@ class Shairport:
             d['active_remote_token'] = info[1]
             d['DACP-ID'] = info[2]
             d['client_IP'] = info[3]
-        # return d
     except Exception:
       pass
 
-    return d
+    return(d)
     # return {'details': 'No info available'}
 
   def status(self):
@@ -479,12 +480,13 @@ class DLNA:
     self.uuid_gen()
     portnum = 49494 + int(src)
 
-    meta_args = ['/home/pi/config/dlna_metadata.bash', '{}'.format(src)]
+    src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), src)
+    meta_args = ['{}/dlna_metadata.bash'.format(utils.get_folder('streams')), '{}'.format(src_config_folder)]
     dlna_args = ['gmediarender', '--gstout-audiosink', 'alsasink',
                 '--gstout-audiodevice', utils.output_device(src), '--gstout-initial-volume-db',
                 '0.0', '-p', '{}'.format(portnum), '-u', '{}'.format(self.uuid),
                 '-f', '{}'.format(self.name), '--logfile',
-                '/home/pi/config/srcs/{}/metafifo'.format(src)]
+                '{}/metafifo'.format(src_config_folder)]
     self.proc = subprocess.Popen(args=meta_args, preexec_fn=os.setpgrp, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     self.proc2 = subprocess.Popen(args=dlna_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     print('{} connected to {}'.format(self.name, src))
@@ -507,7 +509,8 @@ class DLNA:
     self.src = None
 
   def info(self):
-    loc = '/home/pi/config/srcs/{}/currentSong'.format(self.src)
+    src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), self.src)
+    loc = '{}/currentSong'.format(src_config_folder)
     try:
       with open(loc, 'r') as file:
         d = {}
