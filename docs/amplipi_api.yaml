@@ -807,6 +807,12 @@ paths:
                   type: internetradio
                   url: http://classicalking.streamguys1.com/king-fm-aac-iheart
                   logo: https://i.iheart.com/v3/re/assets/images/7bcfd87a-de3e-47d0-b896-be0ed38c9d74.png
+              Add Plexamp Player:
+                value:
+                  name: AmpliPi Plexamp
+                  type: plexamp
+                  user: REPLACE WITH USER ID FROM server.json
+                  token: SAME AS ABOVE BUT TOKEN
         description: Post the necessary fields for the API to create a new stream.
       description: |
         Create a new stream.

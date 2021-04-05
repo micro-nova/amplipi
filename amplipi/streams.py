@@ -43,6 +43,8 @@ def build_stream(args, mock=False):
     return DLNA(args['name'], mock=mock)
   elif args['type'] == 'internetradio':
     return InternetRadio(args['name'], args['url'], args['logo'], mock=mock)
+  elif args['type'] == 'plexamp':
+    return Plexamp(args['name'], args['user'], args['token'], mock=mock)
   else:
     raise NotImplementedError(args['type'])
 
@@ -74,6 +76,19 @@ def write_sp_config_file(filename, config):
         else:
           cfg_file.write('  {} = {}\n'.format(key, value))
       cfg_file.write('};\n')
+
+def uuid_gen():
+  # Get new UUID for the DLNA endpoint
+  u_args = 'uuidgen'
+  uuid_proc = subprocess.run(args=u_args, capture_output=True)
+  uuid_str = str(uuid_proc).split(',')
+  c_check = uuid_str[0]
+  val = uuid_str[2]
+
+  if c_check[0:16] == 'CompletedProcess':
+    return val[10:46]
+  else:
+    return '39ae35cc-b4c1-444d-b13a-294898d771fa' # Generic UUID in case of failure
 
 class Shairport:
   """ An Airplay Stream """
@@ -478,7 +493,7 @@ class DLNA:
 
     # Generate some of the DLNA_Args
     self.uuid = 0
-    self.uuid_gen()
+    self.uuid = uuid_gen()
     portnum = 49494 + int(src)
 
     src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), src)
@@ -524,19 +539,19 @@ class DLNA:
       pass
     return {'details': 'No info available'}
 
-  def uuid_gen(self):
-    # Get new UUID for the DLNA endpoint
-    u_args = 'uuidgen'
-    uuid_proc = subprocess.run(args=u_args, capture_output=True)
-    uuid_str = str(uuid_proc).split(',')
-    c_check = uuid_str[0]
-    val = uuid_str[2]
+  # def uuid_gen(self):
+  #   # Get new UUID for the DLNA endpoint
+  #   u_args = 'uuidgen'
+  #   uuid_proc = subprocess.run(args=u_args, capture_output=True)
+  #   uuid_str = str(uuid_proc).split(',')
+  #   c_check = uuid_str[0]
+  #   val = uuid_str[2]
 
-    if c_check[0:16] == 'CompletedProcess':
-      self.uuid = val[10:46]
-    else:
-      self.uuid = '39ae35cc-b4c1-444d-b13a-294898d771fa' # Generic UUID in case of failure
-    return
+  #   if c_check[0:16] == 'CompletedProcess':
+  #     self.uuid = val[10:46]
+  #   else:
+  #     self.uuid = '39ae35cc-b4c1-444d-b13a-294898d771fa' # Generic UUID in case of failure
+  #   return
 
   def status(self):
     return self.state
@@ -647,9 +662,10 @@ class InternetRadio:
 class Plexamp:
   """ A Plexamp Stream """
 
-  def __init__(self, name, user, password, station, mock=False):
+  def __init__(self, name, user, token, mock=False):
     self.name = name
     self.user = user
+    self.token = token
     self.mock = mock
     self.proc = None  # underlying plexamp process
     self.state = 'disconnected'
@@ -686,83 +702,80 @@ class Plexamp:
       return
 
     src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), src)
-    ######### MAKE SURE THIS ACTUALLY IS GOOD ############
     mpd_template = '{}/mpd.conf'.format(utils.get_folder('streams'))
-    ######### TEMP STOP HERE ###############################
-    pb_home = src_config_folder
-    pb_config_folder = '{}/.config/pianobar'.format(pb_home)
-    pb_control_fifo = '{}/ctl'.format(pb_config_folder)
-    pb_status_fifo = '{}/stat'.format(pb_config_folder)
-    pb_config_file = '{}/config'.format(pb_config_folder)
-    pb_output_file = '{}/output'.format(pb_config_folder)
-    pb_error_file = '{}/error'.format(pb_config_folder)
-    pb_eventcmd_file = '{}/eventcmd.sh'.format(pb_config_folder)
-    pb_src_config_file = '{}/.libao'.format(pb_home)
+    plexamp_template = '{}/server.json'.format(utils.get_folder('streams'))
+    plexamp_home = src_config_folder
+    plexamp_config_folder = '{}/.config/Plexamp'.format(plexamp_home)
+    mpd_conf_file = '{}/mpd.conf'.format(plexamp_home)
+    server_json_file = '{}/server.json'.format(plexamp_config_folder)
     # make all of the necessary dir(s)
-    os.system('mkdir -p {}'.format(pb_config_folder))
-    os.system('cp {} {}'.format(eventcmd_template, pb_eventcmd_file)) # Copy to retains necessary executable status
-    # write pianobar and libao config files
-    write_config_file(pb_config_file, {
-      'user': self.user,
-      'password': self.password,
-      'autostart_station': self.station,
-      'fifo': pb_control_fifo,
-      'event_command': pb_eventcmd_file
-    })
-    write_config_file(pb_src_config_file, {'default_driver': 'alsa', 'dev': utils.output_device(src)})
-    # create fifos if needed
-    if not os.path.exists(pb_control_fifo):
-      os.system('mkfifo {}'.format(pb_control_fifo))
-    if not os.path.exists(pb_status_fifo):
-      os.system('mkfifo {}'.format(pb_status_fifo))
-    # start pandora process in special home
-    print('Pianobar config at {}'.format(pb_config_folder))
+    os.system('mkdir -p {}'.format(plexamp_config_folder))
+    os.system('cp {} {}'.format(mpd_template, mpd_conf_file))
+    os.system('cp {} {}'.format(plexamp_template, server_json_file))
+    self.uuid = uuid_gen()
+    # server.json config (TODO: ADD TOKEN/IDENTIFIER MANAGEMENT. SEE DLNA FOR UUID, BUT TOKEN COMES FROM USER)
+    # Double quotes ("") !!!REQUIRED!!! for Python -> JSON translation
+    with open(server_json_file) as json_file:
+      contents = json.load(json_file)
+      r_id = contents['user']['id']
+      if r_id != 9999999:
+        self.user = r_id
+      r_token = contents['user']['token']
+      if r_token != '_':
+        self.token = r_token
+
+    json_config = {
+      "player": {
+        "name": "{}".format(self.name),
+        "identifier": "{}".format(self.uuid)
+      },
+      "user": {
+        "id": self.user,
+        "token": self.token
+      },
+      "state": "null",
+      "server": "null",
+      "audio": {
+        "normalize": "false",
+        "crossfade": "false",
+        "mpd_path": "{}".format(mpd_conf_file)
+      }
+    }
+
+    with open(server_json_file, 'w') as new_json:
+      json.dump(json_config, new_json, indent=2)
+
+    # mpd.conf creation
+    with open(mpd_conf_file, 'r') as MPD:
+      data = MPD.read()
+      data = data.replace('ch', 'ch{}'.format(src))
+      data = data.replace('GENERIC_LOGFILE_LOCATION', '{}/mpd.log'.format(plexamp_config_folder))
+    with open(mpd_conf_file, 'w') as MPD:
+      MPD.write(data)
+    # PROCESS
+    plexamp_args = '/usr/bin/node /home/pi/plexamp/server/server.prod.js'
     try:
-      self.proc = subprocess.Popen(args='pianobar', stdin=subprocess.PIPE, stdout=open(pb_output_file, 'w'), stderr=open(pb_error_file, 'w'), env={'HOME' : pb_home})
-      time.sleep(0.1) # Delay a bit before creating a control pipe to pianobar
-      self.ctrl = Pandora.Control(pb_control_fifo)
+      self.proc = subprocess.Popen(args=plexamp_args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env={'HOME' : plexamp_home})
+      time.sleep(0.1) # Delay a bit
       self.src = src
-      self.state = 'playing'
       print('{} connected to {}'.format(self.name, src))
     except Exception as e:
-      print('error starting pianobar: {}'.format(e))
+      print('error starting plexamp: {}'.format(e))
 
-  def _is_pb_running(self):
+  def _is_plexamp_running(self):
     if self.proc:
       return self.proc.poll() is None
     return False
 
   def disconnect(self):
-    if self._is_pb_running():
-      self.ctrl.stop()
+    if self._is_plexamp_running():
       self.proc.kill()
       print('{} disconnected'.format(self.name))
     self.state = 'disconnected'
     self.proc = None
-    self.ctrl = None
     self.src = None
 
   def info(self):
-    src_config_folder = '{}/srcs/{}'.format(utils.get_folder('config'), self.src)
-    loc = '{}/.config/pianobar/currentSong'.format(src_config_folder)
-    try:
-      with open(loc, 'r') as file:
-        d = {}
-        for line in file.readlines():
-          line = line.strip()
-          if line:
-            data = line.split(',,,')
-            d['artist'] = data[0]
-            d['track'] = data[1]
-            d['album'] = data[2]
-            d['img_url'] = data[3]
-            d['station'] = data[5]
-        return(d)
-    except Exception:
-      pass
-      #print(error('Failed to get currentSong - it may not exist: {}'.format(e)))
-    # TODO: report the status of pianobar with station name, playing/paused, song info
-    # ie. Playing: "Cameras by Matt and Kim" on "Matt and Kim Radio"
     return {'details': 'No info available'}
 
   def status(self):
