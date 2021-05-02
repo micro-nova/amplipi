@@ -2,6 +2,11 @@
 #
 # Requirements:
 # pip: adafruit-circuitpython-rgb-display pillow
+#
+# TODO:
+# Clear screen on exit/failure or provide some other indication that the
+#   display is still being updated.
+# Why is touch always reading 0x000000
 
 import board
 import busio
@@ -30,6 +35,8 @@ cs_pin = digitalio.DigitalInOut(board.CE0) #board.D43
 dc_pin = digitalio.DigitalInOut(board.D25) #board.D39
 led_pin = board.D18
 rst_pin = None
+t_cs_pin = board.D5
+t_irq_pin = board.D6
 
 # Network interface name to get IP address of
 iface_name = "eth0"
@@ -88,45 +95,38 @@ led.duty_cycle = 0
 
 
 # Create the touch controller:
-touch_cs  = digitalio.DigitalInOut(board.D45)
+touch_cs = digitalio.DigitalInOut(t_cs_pin)
 touch_cs.direction = digitalio.Direction.OUTPUT
 touch_cs.value = True
 
-touch_irq = digitalio.DigitalInOut(board.D38)
+touch_irq = digitalio.DigitalInOut(t_irq_pin)
 touch_irq.direction = digitalio.Direction.INPUT
 
 # touch callback
-def touch_callback():
+def touch_callback(pin_num):
+  GPIO.remove_event_detect(t_irq_pin.id)
 
-  GPIO.remove_event_detect(38)
+  print('Touch event!')
 
-  rx_buf = bytearray(3)  # Receive buffer
-
-  print("Touch event!")
   # try to access SPI, wait if someone else (i.e. screen) is busy
   while not spi.try_lock():
     pass
-
-  spi.configure(baudrate=10000, phase=0, polarity=0)
+  spi.configure(baudrate=5000)
   touch_cs.value = False
-
   spi.write(bytes([0b11010000]))
-
+  rx_buf = bytearray(3)
   spi.readinto(rx_buf)
-  print("RX = ")
-  print(rx_buf)
-
   touch_cs.value = True
-  # free up for other usage
+  spi.configure(baudrate=spi_baud)
   spi.unlock()
 
-  GPIO.add_event_detect(38,GPIO.RISING,callback=touch_callback)
+  print('RX = ', rx_buf)
+
+  GPIO.add_event_detect(t_irq_pin.id, GPIO.RISING, callback=touch_callback)
 
 # Get touch events
-#GPIO.setwarnings(False)
-#GPIO.setmode(GPIO.BCM)
-#GPIO.setup(38, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-#GPIO.add_event_detect(38,GPIO.RISING,callback=touch_callback)
+GPIO.setup(t_irq_pin.id, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(t_irq_pin.id, GPIO.RISING, callback=touch_callback)
 
 # Load image and convert to RGB
 logo = Image.open('micronova-320x240.png').convert('RGB')
