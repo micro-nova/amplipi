@@ -143,13 +143,10 @@ except:
   print("Failed to load font")
 
 # Create a blank image for drawing.
-if display.rotation % 180 == 90:
-  # Swap height/width to rotate it to landscape
-  height = display.width
-  width = display.height
-else:
-  width = display.width
-  height = display.height
+# Swap height/width to rotate it to landscape
+# TODO: Reduce size if possible to save CPU time
+height = display.width
+width = display.height
 image = Image.new("RGB", (width, height)) # Fill entire screen with drawing space
 draw = ImageDraw.Draw(image)
 draw.rectangle((0, 0, width, height), outline=0, fill=(0, 0, 0)) # Black background
@@ -159,6 +156,8 @@ if profile:
   pr.enable()
 
 first_frame = True
+frame_times = []
+cpu_load = []
 while first_frame == True:
   start = time.time()
 
@@ -172,6 +171,7 @@ while first_frame == True:
   cpu_temp = psutil.sensors_temperatures()['cpu_thermal'][0].current
   cpu_str1 = f'{cpu_pcnt:4.1f}%'
   cpu_str2 = f'{cpu_temp:4.1f}\xb0C'
+  cpu_load.append(cpu_pcnt)
 
   ram_total = int(psutil.virtual_memory().total / (1024*1024))
   ram_used  = int(psutil.virtual_memory().used / (1024*1024))
@@ -207,8 +207,14 @@ while first_frame == True:
 
   # Update display
   display.image(image)
-  #time.sleep(1.0)
-  print("Frame time:", time.time() - start)
+  end = time.time()
+  time.sleep(2.0 - (end-start))
+  frame_times.append(end - start)
+  print(f'frame time: {sum(frame_times)/len(frame_times):.3f}s, {sum(cpu_load)/len(cpu_load):.1f}%')
+  # Original:       frame time: 1.191s, 26.8%
+  # Install Numpy:  frame time: 1.179s, 26.6%
+  # Reduce height:  frame time: 0.409s, 28.4%
+  # 1s rate:        frame time: 0.438s, 16.3%
 
   if profile:
     first_frame = False
